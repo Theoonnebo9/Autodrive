@@ -1,3 +1,4 @@
+local BinaryHeap = require("C:/Users/theoo/AppData/Roaming/Cherax/Lua/BinaryHeap")
 -- Variables
 local PlayerChar = STATS.STAT_GET_INT(g_util.joaat("MPPLY_LAST_MP_CHAR"));
 local PlayerPed =  PLAYER.GET_PLAYER_PED(PLAYER.PLAYER_ID());
@@ -50,7 +51,7 @@ function driveWaypoint()
     end
 end
 -- Pathfind
-local BinaryHeap = require("binary_heap")
+
 
 local openSet = BinaryHeap(function(node1, node2) return node1.fScore < node2.fScore end)
 
