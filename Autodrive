@@ -53,13 +53,10 @@ end
 function findPath(start, goal)
     local closedSet = {}
     local openSet = {}
-    local obstacleSet = {}
     openSet[start] = start
     local cameFrom = {}
     local gScore = {}
-    local speedMap = {}
     gScore[start] = 0
-    speedMap[start] = getVehicleMaxSpeed()
     local fScore = {}
     fScore[start] = heuristic(start, goal)
 
@@ -79,39 +76,32 @@ function findPath(start, goal)
             end
 
             local tentative_gScore = gScore[current] + distance(current, neighbor)
-            local obstacleDetected = false
-            local speed = getVehicleMaxSpeed()
 
-            for k, obstacle in ipairs(obstacleSet) do
-                local obstacleVel = getEntitySpeedVector(obstacle)
-                local vehicleVel = getEntitySpeedVector(getVehiclePedIsIn(PlayerPed))
-                local relVel = obstacleVel - vehicleVel
-                if not obstacleDetected then
-                    local collision, _, _, _, _ = WORLDPROBE.PROBE_AGAINST_ENTITY(neighbor, obstacle, false, -1)
-                    if collision == 1 and relVel:length() >= speed * 0.85 then
-                        obstacleDetected = true
-                    end
-                end
+            -- Perform safety check
+            local safetyCheckPassed = true
+            local obstacles = worldprobeCheck(current, neighbor) -- Check for static obstacles
+            if #obstacles > 0 then
+                safetyCheckPassed = false
+            end
+            local peds = getNearbyPeds(current, neighbor) -- Check for nearby peds
+            if #peds > 0 then
+                safetyCheckPassed = false
+            end
+            if not isSafeToDrive(current, neighbor) then -- Check if it's safe to drive
+                safetyCheckPassed = false
             end
 
-            if obstacleDetected then
-                table.insert(obstacleSet, neighbor)
-                speed = 0
-            else
+            if safetyCheckPassed then
+                if not openSet[neighbor] then
+                    gScore[neighbor] = math.huge
+                end
+
                 local limitedSpeed = limitSpeed(current, neighbor, getVehicleMaxSpeed())
-                if limitedSpeed < speed then
-                    speed = limitedSpeed
+                if limitedSpeed == 0 then -- if limitedSpeed is zero then neighbor is not reachable, so skip it
+                    goto skip
                 end
-            end
 
-            local hScore = heuristic(neighbor, goal)
-            local f = tentative_gScore + (hScore / speed) + obstacleCost(obstacleSet, neighbor, start) -- Obstacle cost now takes starting point as argument.
-
-            if not openSet[neighbor] or f < fScore[neighbor] then
-                cameFrom[neighbor] = current
-                gScore[neighbor] = tentative_gScore
-                fScore[neighbor] = f
-                speedMap[neighbor] = speed
+                updateIfBetterPath(current, neighbor, goal, gScore, fScore, cameFrom, limitedSpeed)
                 openSet[neighbor] = neighbor
             end
             ::skip::
