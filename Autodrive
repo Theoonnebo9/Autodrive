@@ -1,1 +1,122 @@
-a
+-- Variables
+local PlayerChar = STATS.STAT_GET_INT(g_util.joaat("MPPLY_LAST_MP_CHAR"));
+local PlayerPed =  PLAYER.GET_PLAYER_PED(PLAYER.PLAYER_ID());
+local root = MISC.GET_APPDATA_PATH("Cherax", "Lua")
+
+
+-- Functions
+
+function autodrive(value)
+    autodrivetog = value
+end
+--Auto Drive
+function driveWaypoint()
+    local vehicle = PED.GET_VEHICLE_PED_IS_IN(PlayerPed, false)
+    blip = UI.GET_FIRST_BLIP_INFO_ID(8)
+    if UI.DOES_BLIP_EXIST(blip) then
+        local Cor = UI.GET_BLIP_INFO_ID_COORD(blip)
+        TASK.TASK_VEHICLE_DRIVE_TO_COORD_LONGRANGE(PlayerPed, vehicle, Cor.x, Cor.y, Cor.z, 100, 1074528293, 5)
+        waypointcheck = true
+    else
+        g_gui.add_toast("Set a waypoint first!", 3000)
+    end
+end
+-- Pathfind
+function findPath(start, goal)
+    local closedSet = {}
+    local openSet = {}
+    local obstacleSet = {}
+    openSet[start] = start
+    local cameFrom = {}
+    local gScore = {}
+    gScore[start] = 0
+    local fScore = {}
+    fScore[start] = heuristic(start, goal)
+
+    while not is_empty(openSet) do
+        local current = get_lowest_f(openSet, fScore)
+        if current == goal then
+            return reconstruct_path(cameFrom, current)
+        end
+
+        openSet[current] = nil
+        closedSet[current] = current
+        local neighbors = get_neighbors(current)
+
+        for _, neighbor in ipairs(neighbors) do
+            if closedSet[neighbor] then
+                goto skip
+            end
+
+            local tentative_gScore = gScore[current] + distance(current, neighbor)
+            local obstacleDetected
+
+            for obstacle in ipairs(obstacleSet) do
+                if not obstacleDetected then
+                    local collision, _, _, _, _ = WORLDPROBE.PROBE_AGAINST_ENTITY(neighbor, obstacle, false, -1)
+                    if collision == 1 then
+                        obstacleDetected = true
+                    end
+                end
+            end
+
+            if not obstacleDetected then
+                if not openSet[neighbor] or tentative_gScore < gScore[neighbor] then
+                    cameFrom[neighbor] = current
+                    gScore[neighbor] = tentative_gScore
+                    fScore[neighbor] = tentative_gScore + heuristic(neighbor, goal)
+                    openSet[neighbor] = neighbor
+                end
+            else
+                table.insert(obstacleSet, neighbor)
+            end
+            ::skip::
+        end
+    end
+
+    return nil
+end
+
+--Initializing and Hook
+g_util.play_wav_file(root.."/resources/bruh.wav", false, false)
+g_gui.add_toast("Created by Theo", 10000)
+g_gui.add_toast("Welcome, ".. PLAYER.GET_PLAYER_NAME(PLAYER.PLAYER_ID()) .. " to Autodrive", 10000)
+function myD3DHook()
+    if  g_gui.is_open() then
+        g_imgui.set_next_window_size(vec2(250, 500))
+        if  g_imgui.begin_window("Autodrive", ImGuiWindowFlags_NoResize) then
+            g_imgui.begin_child("mod_menu", vec2(), true)
+
+            -- Autodrive
+            if  g_imgui.begin_menu("Auto-Drive", true) then
+                g_imgui.add_button("Drive To Waypoint", vec2(300, 20), driveWaypoint)
+                g_imgui.end_menu()  -- Auto-Drive Options End
+            end
+
+            g_imgui.add_text("")
+            g_imgui.separator() -- Misc Options End
+            g_imgui.end_child()
+            g_imgui.end_window() -- Mod Menu End
+        end
+    end
+end
+
+
+
+
+g_lua.register()
+g_hooking.register_D3D_hook(myD3DHook)
+
+while g_isRunning do
+    if waypointcheck then
+        if not UI.DOES_BLIP_EXIST(blip) then
+            local vehicle = PED.GET_VEHICLE_PED_IS_IN(PlayerPed, false)
+            VEHICLE.SET_VEHICLE_FORWARD_SPEED(vehicle, 0)
+            PED.CLEAR_PED_TASKS_IMMEDIATELY(PlayerPed)
+            g_gui.add_toast("Destination Reached.",5000)
+            waypointcheck = false
+        end
+    end
+    g_util.yield(100)
+end
+g_lua.unregister()
