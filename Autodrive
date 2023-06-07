@@ -1,3 +1,11 @@
+-- Change working directory to current script directory
+local scriptPath = debug.getinfo(1).source:match("@(.*/)")
+if scriptPath then
+    scriptPath = scriptPath:sub(1, #scriptPath - 1)
+    package.path = package.path .. ";" .. scriptPath .. "/?.lua"
+    package.cpath = package.cpath .. ";" .. scriptPath .. "/?.dll"
+    assert(lfs.chdir(scriptPath), "Unable to change working directory to script path: " .. scriptPath)
+end
 local BinaryHeap = require("C:/Users/theoo/AppData/Roaming/Cherax/Lua/BinaryHeap")
 -- Variables
 local PlayerChar = STATS.STAT_GET_INT(g_util.joaat("MPPLY_LAST_MP_CHAR"));
