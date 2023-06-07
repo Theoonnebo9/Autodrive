@@ -53,10 +53,13 @@ end
 function findPath(start, goal)
     local closedSet = {}
     local openSet = {}
+    local obstacleSet = {}
     openSet[start] = start
     local cameFrom = {}
     local gScore = {}
+    local speedMap = {}
     gScore[start] = 0
+    speedMap[start] = getVehicleMaxSpeed()
     local fScore = {}
     fScore[start] = heuristic(start, goal)
 
@@ -69,17 +72,43 @@ function findPath(start, goal)
         openSet[current] = nil
         closedSet[current] = current
         local neighbors = get_neighbors(current)
+
         for _, neighbor in ipairs(neighbors) do
             if closedSet[neighbor] then
                 goto skip
             end
 
             local tentative_gScore = gScore[current] + distance(current, neighbor)
+            local obstacleDetected
+            local speed = getVehicleMaxSpeed()
 
-            if not openSet[neighbor] or tentative_gScore < gScore[neighbor] then
+            for obstacle in ipairs(obstacleSet) do
+                if not obstacleDetected then
+                    local collision, _, _, _, _ = WORLDPROBE.PROBE_AGAINST_ENTITY(neighbor, obstacle, false, -1)
+                    if collision == 1 then
+                        obstacleDetected = true
+                    end
+                end
+            end
+
+            if obstacleDetected then
+                table.insert(obstacleSet, neighbor)
+                speed = 0
+            else
+                local limitedSpeed = limitSpeed(current, neighbor, getVehicleMaxSpeed())
+                if limitedSpeed < speed then
+                    speed = limitedSpeed
+                end
+            end
+
+            local hScore = heuristic(neighbor, goal)
+            local f = tentative_gScore + (hScore / speed) + obstacleCost(obstacleSet, neighbor) -- Obstacle cost is a function that returns the cost of obstacles between current and neighbor.
+
+            if not openSet[neighbor] or f < fScore[neighbor] then
                 cameFrom[neighbor] = current
                 gScore[neighbor] = tentative_gScore
-                fScore[neighbor] = tentative_gScore + heuristic(neighbor, goal)
+                fScore[neighbor] = f
+                speedMap[neighbor] = speed
                 openSet[neighbor] = neighbor
             end
             ::skip::
@@ -87,30 +116,6 @@ function findPath(start, goal)
     end
 
     return nil
-end
-
---Initializing and Hook
-g_util.play_wav_file(root.."/resources/bruh.wav", false, false)
-g_gui.add_toast("Created by Theo", 10000)
-g_gui.add_toast("Welcome, ".. PLAYER.GET_PLAYER_NAME(PLAYER.PLAYER_ID()) .. " to Autodrive", 10000)
-function myD3DHook()
-    if  g_gui.is_open() then
-        g_imgui.set_next_window_size(vec2(250, 500))
-        if  g_imgui.begin_window("Autodrive", ImGuiWindowFlags_NoResize) then
-            g_imgui.begin_child("mod_menu", vec2(), true)
-
-            -- Autodrive
-            if  g_imgui.begin_menu("Auto-Drive", true) then
-                g_imgui.add_button("Drive To Waypoint", vec2(300, 20), driveWaypoint)
-                g_imgui.end_menu()  -- Auto-Drive Options End
-            end
-
-            g_imgui.add_text("")
-            g_imgui.separator() -- Misc Options End
-            g_imgui.end_child()
-            g_imgui.end_window() -- Mod Menu End
-        end
-    end
 end
 
 
