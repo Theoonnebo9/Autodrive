@@ -60,6 +60,8 @@ function findPath(start, goal)
     local fScore = {}
     fScore[start] = heuristic(start, goal)
 
+    local gamePath = getGamePath(start, goal) -- Retrieve the game's default path
+
     while not is_empty(openSet) do
         local current = get_lowest_f(openSet, fScore)
         if current == goal then
@@ -105,6 +107,11 @@ function findPath(start, goal)
                 openSet[neighbor] = neighbor
             end
             ::skip::
+        end
+
+        -- Use game's path as a fallback if no better path is found
+        if is_empty(openSet) and not is_empty(gamePath) then
+            return gamePath
         end
     end
 
