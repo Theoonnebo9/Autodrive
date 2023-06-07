@@ -50,71 +50,92 @@ function driveWaypoint()
     end
 end
 -- Pathfind
+local BinaryHeap = require("binary_heap")
+
+local openSet = BinaryHeap(function(node1, node2) return node1.fScore < node2.fScore end)
+
 function findPath(start, goal)
     local closedSet = {}
-    local openSet = {}
-    openSet[start] = start
+    local openSet = BinaryHeap(function(node1, node2) return node1.fScore < node2.fScore end)
+    -- Initialize the openSet with the start node
+    local startNode = { pos = start, gScore = 0, fScore = heuristic(start, goal) }
+    openSet:push(startNode, startNode.fScore)
     local cameFrom = {}
-    local gScore = {}
-    gScore[start] = 0
-    local fScore = {}
-    fScore[start] = heuristic(start, goal)
 
     local gamePath = getGamePath(start, goal) -- Retrieve the game's default path
 
-    while not is_empty(openSet) do
-        local current = get_lowest_f(openSet, fScore)
-        if current == goal then
-            return reconstruct_path(cameFrom, current)
+    while not openSet:isEmpty() do
+        -- Retrieve the node with the lowest f-score from the priority queue
+        local currentNode = openSet:pop()
+
+        if currentNode.pos == goal then
+            -- If we've reached the goal, reconstruct the path and return it
+            return reconstruct_path(cameFrom, currentNode)
         end
 
-        openSet[current] = nil
-        closedSet[current] = current
-        local neighbors = get_neighbors(current)
+        -- Add the current node to the closed set
+        closedSet[currentNode.pos] = true
+
+        -- Get the current node's neighbors
+        local neighbors = get_neighbors(currentNode.pos)
 
         for _, neighbor in ipairs(neighbors) do
             if closedSet[neighbor] then
+                -- Skip nodes that are already in the closed set
                 goto skip
             end
 
-            local tentative_gScore = gScore[current] + distance(current, neighbor)
+            -- Calculate the tentative g-score for the neighbor
+            local tentative_gScore = currentNode.gScore + distance(currentNode.pos, neighbor)
 
             -- Perform safety check
             local safetyCheckPassed = true
-            local obstacles = worldprobeCheck(current, neighbor) -- Check for static obstacles
+            local obstacles = worldprobeCheck(currentNode.pos, neighbor) -- Check for static obstacles
             if #obstacles > 0 then
                 safetyCheckPassed = false
             end
-            local peds = getNearbyPeds(current, neighbor) -- Check for nearby peds
+            local peds = getNearbyPeds(currentNode.pos, neighbor) -- Check for nearby peds
             if #peds > 0 then
                 safetyCheckPassed = false
             end
-            if not isSafeToDrive(current, neighbor) then -- Check if it's safe to drive
+            if not isSafeToDrive(currentNode.pos, neighbor) then -- Check if it's safe to drive
                 safetyCheckPassed = false
             end
 
             if safetyCheckPassed then
-                if not openSet[neighbor] then
-                    gScore[neighbor] = math.huge
-                end
+                -- Create a neighbor node with the necessary information
+                local neighborNode = {
+                    pos = neighbor,
+                    gScore = tentative_gScore,
+                    fScore = tentative_gScore + heuristic(neighbor, goal),
+                }
 
-                local limitedSpeed = limitSpeed(current, neighbor, getVehicleMaxSpeed())
-                if limitedSpeed == 0 then -- if limitedSpeed is zero then neighbor is not reachable, so skip it
+                if not openSet:contains(neighborNode) then
+                    -- If the neighbor is not in the open set, add it and set the cameFrom relationship
+                    cameFrom[neighbor] = currentNode.pos
+                    openSet:push(neighborNode, neighborNode.fScore)
+                elseif tentative_gScore >= neighborNode.gScore then
+                    -- If the neighbor is in the open set and the new tentative g-score is higher or equal to the previous g-score, skip it
                     goto skip
+                else
+                    -- If the neighbor is in the open set and the new tentative g-score is lower, update its information and set the cameFrom relationship
+                    cameFrom[neighbor] = currentNode.pos
+                    neighborNode.gScore = tentative_gScore
+                    neighborNode.fScore = tentative_gScore + heuristic(neighbor, goal)
+                    openSet:update(neighborNode, neighborNode.fScore)
                 end
-
-                updateIfBetterPath(current, neighbor, goal, gScore, fScore, cameFrom, limitedSpeed)
-                openSet[neighbor] = neighbor
             end
+
             ::skip::
         end
 
         -- Use game's path as a fallback if no better path is found
-        if is_empty(openSet) and not is_empty(gamePath) then
+        if openSet:isEmpty() and not is_empty(gamePath) then
             return gamePath
         end
     end
 
+    -- If we reach this point, there is no path to the goal
     return nil
 end
 
