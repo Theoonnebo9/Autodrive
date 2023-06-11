@@ -1,176 +1,47 @@
--- Change working directory to current script directory
-local scriptPath = debug.getinfo(1).source:match("@(.*/)")
-if scriptPath then
-    scriptPath = scriptPath:sub(1, #scriptPath - 1)
-    package.path = package.path .. ";" .. scriptPath .. "/?.lua"
-    package.cpath = package.cpath .. ";" .. scriptPath .. "/?.dll"
-    assert(lfs.chdir(scriptPath), "Unable to change working directory to script path: " .. scriptPath)
-end
-local BinaryHeap = require("C:/Users/theoo/AppData/Roaming/Cherax/Lua/BinaryHeap")
--- Variables
+-- Variables 
 local PlayerChar = STATS.STAT_GET_INT(g_util.joaat("MPPLY_LAST_MP_CHAR"));
-local PlayerPed =  PLAYER.GET_PLAYER_PED(PLAYER.PLAYER_ID());
+local PlayerPed = PLAYER.GET_PLAYER_PED(PLAYER.PLAYER_ID());
 local root = MISC.GET_APPDATA_PATH("Cherax", "Lua")
 
 
--- Functions
+-- Functions 
 
 function autodrive(value)
     autodrivetog = value
 end
---Auto Drive
+--Auto Drive 
 function driveWaypoint()
     local vehicle = PED.GET_VEHICLE_PED_IS_IN(PlayerPed, false)
     blip = UI.GET_FIRST_BLIP_INFO_ID(8)
     if UI.DOES_BLIP_EXIST(blip) then
         local Cor = UI.GET_BLIP_INFO_ID_COORD(blip)
-        local direction = (Cor - ENTITY.GET_ENTITY_COORDS(vehicle)):normalized()
-        local distance = #(Cor - ENTITY.GET_ENTITY_COORDS(vehicle))
-
-        g_gui.add_toast("Calculating route...", 3000)
-        local route = findPath(ENTITY.GET_ENTITY_COORDS(vehicle), Cor)
-        if route then
-            for i, pos in ipairs(route) do
-                if distance <= 5 then
-                    break
-                end
-
-                -- Check for obstacles along the way
-                local collision, _, _, _, hitEntity = WORLDPROBE.PROBE_AGAINST_ENTITY(pos, vehicle, false, -1)
-                if collision == 1 and hitEntity ~= vehicle then
-                    g_gui.add_toast("Avoiding obstacle...", 3000)
-                    local newCor = pos + (pos - ENTITY.GET_ENTITY_COORDS(hitEntity)):normalized() * 10
-                    TASK.TASK_VEHICLE_DRIVE_TO_COORD_LONGRANGE(PlayerPed, vehicle, newCor.x, newCor.y, pos.z, 100, 1074528293, 5)
-                    distance = 0
-                else
-                    TASK.TASK_VEHICLE_DRIVE_TO_COORD_LONGRANGE(PlayerPed, vehicle, pos.x, pos.y, pos.z, 100, 1074528293, 5)
-                    distance = #(Cor - ENTITY.GET_ENTITY_COORDS(vehicle))
-                end
-
-                g_util.yield(200)
-            end
-
-            g_gui.add_toast("Destination reached.", 3000)
-        else
-            g_gui.add_toast("Unable to find route to destination.", 3000)
-        end
+        TASK.TASK_VEHICLE_DRIVE_TO_COORD_LONGRANGE(PlayerPed, vehicle, Cor.x, Cor.y, Cor.z, 100, 1074528293, 5)
+        waypointcheck = true
     else
         g_gui.add_toast("Set a waypoint first!", 3000)
     end
 end
--- Pathfind
 
-
-local openSet = BinaryHeap(function(node1, node2) return node1.fScore < node2.fScore end)
-
-function findPath(start, goal)
-    local closedSet = {}
-    local openSet = BinaryHeap(function(node1, node2) return node1.fScore < node2.fScore end)
-    -- Initialize the openSet with the start node
-    local startNode = { pos = start, gScore = 0, fScore = heuristic(start, goal) }
-    openSet:push(startNode, startNode.fScore)
-    local cameFrom = {}
-
-    local gamePath = getGamePath(start, goal) -- Retrieve the game's default path
-
-    while not openSet:isEmpty() do
-        -- Retrieve the node with the lowest f-score from the priority queue
-        local currentNode = openSet:pop()
-
-        if currentNode.pos == goal then
-            -- If we've reached the goal, reconstruct the path and return it
-            return reconstruct_path(cameFrom, currentNode)
-        end
-
-        -- Add the current node to the closed set
-        closedSet[currentNode.pos] = true
-
-        -- Get the current node's neighbors
-        local neighbors = get_neighbors(currentNode.pos)
-
-        for _, neighbor in ipairs(neighbors) do
-            if closedSet[neighbor] then
-                -- Skip nodes that are already in the closed set
-                goto skip
-            end
-
-            -- Calculate the tentative g-score for the neighbor
-            local tentative_gScore = currentNode.gScore + distance(currentNode.pos, neighbor)
-
-            -- Perform safety check
-            local safetyCheckPassed = true
-            local obstacles = worldprobeCheck(currentNode.pos, neighbor) -- Check for static obstacles
-            if #obstacles > 0 then
-                safetyCheckPassed = false
-            end
-            local peds = getNearbyPeds(currentNode.pos, neighbor) -- Check for nearby peds
-            if #peds > 0 then
-                safetyCheckPassed = false
-            end
-            if not isSafeToDrive(currentNode.pos, neighbor) then -- Check if it's safe to drive
-                safetyCheckPassed = false
-            end
-
-            if safetyCheckPassed then
-                -- Create a neighbor node with the necessary information
-                local neighborNode = {
-                    pos = neighbor,
-                    gScore = tentative_gScore,
-                    fScore = tentative_gScore + heuristic(neighbor, goal),
-                }
-
-                if not openSet:contains(neighborNode) then
-                    -- If the neighbor is not in the open set, add it and set the cameFrom relationship
-                    cameFrom[neighbor] = currentNode.pos
-                    openSet:push(neighborNode, neighborNode.fScore)
-                elseif tentative_gScore >= neighborNode.gScore then
-                    -- If the neighbor is in the open set and the new tentative g-score is higher or equal to the previous g-score, skip it
-                    goto skip
-                else
-                    -- If the neighbor is in the open set and the new tentative g-score is lower, update its information and set the cameFrom relationship
-                    cameFrom[neighbor] = currentNode.pos
-                    neighborNode.gScore = tentative_gScore
-                    neighborNode.fScore = tentative_gScore + heuristic(neighbor, goal)
-                    openSet:update(neighborNode, neighborNode.fScore)
-                end
-            end
-
-            ::skip::
-        end
-
-        -- Use game's path as a fallback if no better path is found
-        if openSet:isEmpty() and not is_empty(gamePath) then
-            return gamePath
-        end
-    end
-
-    -- If we reach this point, there is no path to the goal
-    return nil
-end
-
-
-
-
---Initializing and Hook
+--Initializing and Hook 
 g_util.play_wav_file(root.."/resources/bruh.wav", false, false)
 g_gui.add_toast("Created by Theo", 10000)
 g_gui.add_toast("Welcome, ".. PLAYER.GET_PLAYER_NAME(PLAYER.PLAYER_ID()) .. " to Autodrive", 10000)
 function myD3DHook()
-    if  g_gui.is_open() then
+    if g_gui.is_open() then
         g_imgui.set_next_window_size(vec2(250, 500))
-        if  g_imgui.begin_window("Autodrive", ImGuiWindowFlags_NoResize) then
+        if g_imgui.begin_window("Autodrive", ImGuiWindowFlags_NoResize) then
             g_imgui.begin_child("mod_menu", vec2(), true)
 
-            -- Autodrive
-            if  g_imgui.begin_menu("Auto-Drive", true) then
+            -- Autodrive 
+            if g_imgui.begin_menu("Auto-Drive", true) then
                 g_imgui.add_button("Drive To Waypoint", vec2(300, 20), driveWaypoint)
-                g_imgui.end_menu()  -- Auto-Drive Options End
+                g_imgui.end_menu() -- Auto-Drive Options End 
             end
 
             g_imgui.add_text("")
-            g_imgui.separator() -- Misc Options End
+            g_imgui.separator() -- Misc Options End 
             g_imgui.end_child()
-            g_imgui.end_window() -- Mod Menu End
+            g_imgui.end_window() -- Mod Menu End 
         end
     end
 end
@@ -193,4 +64,4 @@ while g_isRunning do
     end
     g_util.yield(100)
 end
-g_lua.unregister()
+g_lua.unregister() 
