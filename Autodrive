@@ -1,67 +1,273 @@
--- Variables 
-local PlayerChar = STATS.STAT_GET_INT(g_util.joaat("MPPLY_LAST_MP_CHAR"));
-local PlayerPed = PLAYER.GET_PLAYER_PED(PLAYER.PLAYER_ID());
+-- Variables
+local PlayerPed = PLAYER.GET_PLAYER_PED(PLAYER.PLAYER_ID())
 local root = MISC.GET_APPDATA_PATH("Cherax", "Lua")
+local destination = vector3(-999.0, -999.0, -999.0) -- initialize destination to an invalid point
+local path = {} -- initialize empty path
 
+-- Constants (Adjust as needed)
+local turning_radius = 5.0
+local braking_distance = 10.0
+local max_speed = 30.0 -- m/s
+local max_steering_angle = 30.0 -- degrees
 
--- Functions 
-
+-- Functions
 function autodrive(value)
     autodrivetog = value
 end
---Auto Drive 
-function driveWaypoint()
-    local vehicle = PED.GET_VEHICLE_PED_IS_IN(PlayerPed, false)
-    blip = UI.GET_FIRST_BLIP_INFO_ID(8)
-    if UI.DOES_BLIP_EXIST(blip) then
-        local Cor = UI.GET_BLIP_INFO_ID_COORD(blip)
-        TASK.TASK_VEHICLE_DRIVE_TO_COORD_LONGRANGE(PlayerPed, vehicle, Cor.x, Cor.y, Cor.z, 100, 1074528293, 5)
-        waypointcheck = true
+
+function calculate_distance(a, b)
+    local dx = b.x - a.x
+    local dy = b.y - a.y
+    local dist = math.sqrt(dx * dx + dy * dy)
+    return dist
+end
+
+function calculate_angle(a, b)
+    local dot_product = a.x * b.x + a.y * b.y
+    local magnitude_a = math.sqrt(a.x * a.x + a.y * a.y)
+    local magnitude_b = math.sqrt(b.x * b.x + b.y * b.y)
+    local angle = math.acos(dot_product / (magnitude_a * magnitude_b))
+    return angle * (180 / math.pi) -- convert angle to degrees
+end
+
+function calculate_direction(a, b)
+    local dx = b.x - a.x
+    local dy = b.y - a.y
+    local angle = math.atan2(dy, dx)
+    local direction = angle * (180 / math.pi)
+    return direction
+end
+
+function calculate_path(start, goal)
+    local visited_set = {} -- set of nodes already evaluated
+    local open_set = { start } -- set of tentative nodes to be evaluated
+    local came_from = {} -- the map of navigated nodes
+    local g_score = { [start] = 0 } -- cost of getting to start node
+    local f_score = { [start] = calculate_distance(start, goal) } -- estimated total cost from start to goal
+
+    while next(open_set) ~= nil do
+        -- find the node with the lowest f_score
+        local current_node = nil
+        local lowest_f_score = math.huge
+        for node in pairs(open_set) do
+            if f_score[node] < lowest_f_score then
+                current_node = node
+                lowest_f_score = f_score[node]
+            end
+        end
+
+        -- if we found the goal, return the path
+        if current_node == goal then
+            return reconstruct_path(came_from, goal)
+        end
+
+        -- remove the current node from the open set
+        open_set[current_node] = nil
+
+        -- add the current node to the visited set
+        visited_set[current_node] = true
+
+        -- examine each neighbor of the current node
+        for _, neighbor in ipairs(get_neighbors(current_node)) do
+            if not visited_set[neighbor] then
+                local tentative_g_score = g_score[current_node] + calculate_distance(current_node, neighbor)
+
+                if not open_set[neighbor] or tentative_g_score < g_score[neighbor] then
+                    -- this path to neighbor is better than any previous one. Record it!
+                    came_from[neighbor] = current_node
+                    g_score[neighbor] = tentative_g_score
+                    f_score[neighbor] = tentative_g_score + calculate_distance(neighbor, goal)
+                    open_set[neighbor] = true
+                end
+            end
+        end
+    end
+
+    -- if we reach this point, we failed to find a path
+    return nil
+end
+
+function get_random_point_within_radius(radius, center)
+    local angle = math.rad(math.random(0, 360))
+    local offset_x = math.sin(angle) * radius
+    local offset_y = math.cos(angle) * radius
+    local point = vector3(center.x + offset_x, center.y + offset_y, center.z)
+    return point
+end
+
+function get_current_speed(veh)
+    local speed = ENTITY.GET_ENTITY_SPEED(veh)
+    return speed
+end
+
+function get_distance_to_next_turn(veh, path)
+    local current_pos = ENTITY.GET_ENTITY_COORDS(veh)
+    local closest_dist = math.huge
+    for i, point in ipairs(path) do
+        local dist = calculate_distance(current_pos, point)
+        if dist < closest_dist then
+            closest_dist = dist
+        else
+            return closest_dist
+        end
+    end
+    return closest_dist
+end
+
+function get_required_speed_to_take_turn(veh, radius, angle)
+    -- Calculate required speed based on turning radius and angle
+    local speed = math.sqrt(radius * 9.81 * math.tan(math.rad(angle)))
+    return speed
+end
+
+function maintain_speed(veh, speed)
+    VEHICLE.SET_VEHICLE_FORWARD_SPEED(veh, speed)
+end
+
+function brake(veh, speed, t)
+    local stop_dist = speed * t
+    local stop_time = stop_dist / speed
+    local brake_time = math.sqrt(2 * stop_time)
+    local brake_dist = speed * brake_time
+    VEHICLE.SET_VEHICLE_FORWARD_SPEED(veh, 0.0)
+    return brake_time
+end
+
+function accel_to_required_speed(veh, speed, required_speed)
+    local acceleration = 2.0
+    local max_acceleration_time = (required_speed - speed) / acceleration
+    local max_acceleration_dist = speed * max_acceleration_time + 0.5 * acceleration * max_acceleration_time^2
+    local remaining_dist = get_distance_to_next_turn(veh, path)
+    local remaining_time = remaining_dist / required_speed
+    local brake_time = brake(veh, speed, remaining_time)
+    local accel_dist = remaining_dist - brake_time * required_speed
+    local accel_time = accel_dist / required_speed
+
+    if accel_dist > max_acceleration_dist then
+        accel_time = max_acceleration_time
+    end
+
+    local remaining_accel_time = accel_time - brake_time
+    local remaining_accel_dist = remaining_accel_time * (speed + 0.5 * acceleration * remaining_accel_time)
+
+    TASK.TASK_VEHICLE_DRIVE_TO_COORD(PlayerPed, veh, destination.x, destination.y, destination.z, required_speed, 1, GetEntityModel(veh), 786603, 2.0, true)
+
+    if remaining_accel_dist < braking_distance then
+        maintain_speed(veh, 0.0)
     else
-        g_gui.add_toast("Set a waypoint first!", 3000)
+        maintain_speed(veh, required_speed)
+    end
+
+    return accel_time * 1000
+end
+
+function steer_to_next_turn(veh, path)
+    local current_pos = ENTITY.GET_ENTITY_COORDS(veh)
+    local next_turn_point = path[1]
+    local direction_to_point = calculate_direction(current_pos, next_turn_point)
+    local steering_angle = direction_to_point - ENTITY.GET_ENTITY_HEADING(veh)
+    return steering_angle
+end
+
+function reconstruct_path(came_from, current_node)
+    local path = { current_node }
+    while came_from[current_node] do
+        current_node = came_from[current_node]
+        table.insert(path, 1, current_node)
+    end
+    return path
+end
+
+function get_neighbors(node)
+    -- Implement your own logic to retrieve the neighbors of a given node
+    -- Return a table containing the neighboring nodes
+    -- Example implementation:
+    -- local neighbors = {}
+    -- table.insert(neighbors, { x = node.x + 1, y = node.y }) -- right neighbor
+    -- table.insert(neighbors, { x = node.x - 1, y = node.y }) -- left neighbor
+    -- table.insert(neighbors, { x = node.x, y = node.y + 1 }) -- top neighbor
+    -- table.insert(neighbors, { x = node.x, y = node.y - 1 }) -- bottom neighbor
+    -- return neighbors
+end
+
+-- Usage example
+function main()
+    autodrivetog = false -- initialize autodrive toggle
+
+    while true do
+        -- Check if autodrive is enabled
+        if autodrivetog then
+            -- Retrieve current vehicle
+            local veh = PED.GET_VEHICLE_PED_IS_IN(PlayerPed, false)
+
+            -- Check if the player is in a vehicle
+            if veh ~= nil and veh ~= 0 then
+                -- Get current vehicle speed
+                local speed = get_current_speed(veh)
+
+                -- Check if we have reached the current destination
+                if calculate_distance(ENTITY.GET_ENTITY_COORDS(veh), destination) < 5.0 then
+                    -- Generate a random destination point within a radius of 100 units
+                    destination = get_random_point_within_radius(100.0, ENTITY.GET_ENTITY_COORDS(veh))
+                    -- Calculate the path to the destination
+                    path = calculate_path(ENTITY.GET_ENTITY_COORDS(veh), destination)
+                end
+
+                -- Check if we have a valid path
+                if path ~= nil then
+                    -- Check if we need to take a turn
+                    local steering_angle = steer_to_next_turn(veh, path)
+                    if math.abs(steering_angle) > max_steering_angle then
+                        -- We need to take a turn
+                        local radius = turning_radius
+                        local required_speed = get_required_speed_to_take_turn(veh, radius, math.abs(steering_angle))
+                        local time_to_reach_required_speed = accel_to_required_speed(veh, speed, required_speed)
+                        SYSTEM.WAIT(time_to_reach_required_speed)
+                    end
+                end
+
+                -- Maintain current speed
+                maintain_speed(veh, max_speed)
+            end
+        end
+        SYSTEM.WAIT(0) -- Wait for the next frame
     end
 end
 
---Initializing and Hook 
-g_util.play_wav_file(root.."/resources/bruh.wav", false, false)
+-- Call the main function to start the autodrive system
+main()
+
+
+-- Initializing and Hook
+g_util.play_wav_file(root .. "/resources/bruh.wav", false, false)
 g_gui.add_toast("Created by Theo", 10000)
-g_gui.add_toast("Welcome, ".. PLAYER.GET_PLAYER_NAME(PLAYER.PLAYER_ID()) .. " to Autodrive", 10000)
+g_gui.add_toast("Welcome, " .. PLAYER.GET_PLAYER_NAME(PLAYER.PLAYER_ID()) .. " to Autodrive", 10000)
+
 function myD3DHook()
     if g_gui.is_open() then
         g_imgui.set_next_window_size(vec2(250, 500))
         if g_imgui.begin_window("Autodrive", ImGuiWindowFlags_NoResize) then
             g_imgui.begin_child("mod_menu", vec2(), true)
 
-            -- Autodrive 
+            -- Autodrive
             if g_imgui.begin_menu("Auto-Drive", true) then
-                g_imgui.add_button("Drive To Waypoint", vec2(300, 20), driveWaypoint)
-                g_imgui.end_menu() -- Auto-Drive Options End 
+                g_imgui.add_button("Drive To Waypoint", vec2(300, 20), drive_to_destination)
+                g_imgui.end_menu() -- Auto-Drive Options End
             end
 
             g_imgui.add_text("")
-            g_imgui.separator() -- Misc Options End 
+            g_imgui.separator() -- Misc Options End
             g_imgui.end_child()
-            g_imgui.end_window() -- Mod Menu End 
+            g_imgui.end_window() -- Mod Menu End
         end
     end
 end
-
-
-
 
 g_lua.register()
 g_hooking.register_D3D_hook(myD3DHook)
 
 while g_isRunning do
-    if waypointcheck then
-        if not UI.DOES_BLIP_EXIST(blip) then
-            local vehicle = PED.GET_VEHICLE_PED_IS_IN(PlayerPed, false)
-            VEHICLE.SET_VEHICLE_FORWARD_SPEED(vehicle, 0)
-            PED.CLEAR_PED_TASKS_IMMEDIATELY(PlayerPed)
-            g_gui.add_toast("Destination Reached.",5000)
-            waypointcheck = false
-        end
-    end
     g_util.yield(100)
 end
-g_lua.unregister() 
+
+g_lua.unregister()
