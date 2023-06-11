@@ -1,19 +1,26 @@
 -- Variables
+local PlayerChar = STATS.STAT_GET_INT(g_util.joaat("MPPLY_LAST_MP_CHAR"));
 local PlayerPed = PLAYER.GET_PLAYER_PED(PLAYER.PLAYER_ID())
 local root = MISC.GET_APPDATA_PATH("Cherax", "Lua")
-local destination = vector3(-999.0, -999.0, -999.0) -- initialize destination to an invalid point
 local path = {} -- initialize empty path
+
+-- Functions
+function autodrive(value)
+    autodrivetog = value
+end
+
+-- Autodrive
+function vector3(x, y, z)
+    return { x = x, y = y, z = z }
+end
+
+local destination = vector3(-999.0, -999.0, -999.0) -- initialize destination to an invalid point
 
 -- Constants (Adjust as needed)
 local turning_radius = 5.0
 local braking_distance = 10.0
 local max_speed = 30.0 -- m/s
 local max_steering_angle = 30.0 -- degrees
-
--- Functions
-function autodrive(value)
-    autodrivetog = value
-end
 
 function calculate_distance(a, b)
     local dx = b.x - a.x
@@ -252,11 +259,10 @@ end
 main()
 
 
--- Initializing and Hook
-g_util.play_wav_file(root .. "/resources/bruh.wav", false, false)
+--Initializing and Hook
+g_util.play_wav_file(root.."/resources/bruh.wav", false, false)
 g_gui.add_toast("Created by Theo", 10000)
-g_gui.add_toast("Welcome, " .. PLAYER.GET_PLAYER_NAME(PLAYER.PLAYER_ID()) .. " to Autodrive", 10000)
-
+g_gui.add_toast("Welcome, ".. PLAYER.GET_PLAYER_NAME(PLAYER.PLAYER_ID()) .. " to Autodrive", 10000)
 function myD3DHook()
     if g_gui.is_open() then
         g_imgui.set_next_window_size(vec2(250, 500))
@@ -265,7 +271,7 @@ function myD3DHook()
 
             -- Autodrive
             if g_imgui.begin_menu("Auto-Drive", true) then
-                g_imgui.add_button("Drive To Waypoint", vec2(300, 20), drive_to_destination)
+                g_imgui.add_button("Drive To Waypoint", vec2(300, 20), driveWaypoint)
                 g_imgui.end_menu() -- Auto-Drive Options End
             end
 
@@ -277,11 +283,22 @@ function myD3DHook()
     end
 end
 
+
+
+
 g_lua.register()
 g_hooking.register_D3D_hook(myD3DHook)
 
 while g_isRunning do
+    if waypointcheck then
+        if not UI.DOES_BLIP_EXIST(blip) then
+            local vehicle = PED.GET_VEHICLE_PED_IS_IN(PlayerPed, false)
+            VEHICLE.SET_VEHICLE_FORWARD_SPEED(vehicle, 0)
+            PED.CLEAR_PED_TASKS_IMMEDIATELY(PlayerPed)
+            g_gui.add_toast("Destination Reached.",5000)
+            waypointcheck = false
+        end
+    end
     g_util.yield(100)
 end
-
 g_lua.unregister()
