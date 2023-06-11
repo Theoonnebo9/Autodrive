@@ -179,15 +179,29 @@ function reconstruct_path(came_from, current_node)
 end
 
 function get_neighbors(node)
-    -- Implement your own logic to retrieve the neighbors of a given node
-    -- Return a table containing the neighboring nodes
-    -- Example implementation:
-    -- local neighbors = {}
-    -- table.insert(neighbors, { x = node.x + 1, y = node.y }) -- right neighbor
-    -- table.insert(neighbors, { x = node.x - 1, y = node.y }) -- left neighbor
-    -- table.insert(neighbors, { x = node.x, y = node.y + 1 }) -- top neighbor
-    -- table.insert(neighbors, { x = node.x, y = node.y - 1 }) -- bottom neighbor
-    -- return neighbors
+-- find the closest road to the node
+local closestRoad = nil
+local closestRoadDist = 10000
+local x, y, z = node.x, node.y, node.z or 0
+for i = 1, 3 do
+    local road, roadDist = GetClosestRoad(x, y, z, 1.0, 1)
+    if roadDist < closestRoadDist then
+        closestRoad = road
+        closestRoadDist = roadDist
+    end
+end
+
+-- get the adjacent road segments
+local neighbors = {}
+local numNeighbors = GetNumConnectedRoads(closestRoad)
+for i = 0, numNeighbors - 1 do
+    local neighborRoad = GetConnectedRoad(closestRoad, i)
+    local x1, y1, z1, x2, y2, z2 = GetRoadParams(neighborRoad)
+    local neighborX, neighborY = (x1 + x2) / 2, (y1 + y2) / 2
+    table.insert(neighbors, { x = neighborX, y = neighborY })
+end
+
+return neighbors
 end
 
 -- Usage example
